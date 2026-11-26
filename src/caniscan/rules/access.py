@@ -54,7 +54,7 @@ def check_filesystem(target: ScanTarget) -> Iterator[Finding]:
         exe, args = command_line(s)
         if docker_run(exe, args):
             continue  # container mounts are handled by CS006
-        line = target.server_line(s.name)
+        line = s.line
         reported = set()
         for arg in args:
             value = arg.split("=", 1)[1] if arg.startswith("-") and "=" in arg else arg
@@ -98,7 +98,7 @@ def check_transport(target: ScanTarget) -> Iterator[Finding]:
         urls += [m.group(0) for a in s.args for m in URL_IN_ARG.finditer(a)]
         has_auth = any(k.lower() in ("authorization", "x-api-key", "api-key") for k in s.headers) or any(
             "authorization" in a.lower() for a in s.args)
-        line = target.server_line(s.name)
+        line = s.line
         for url in dict.fromkeys(urls):
             sev = _transport_issue(url)
             if sev is None:

@@ -6,7 +6,7 @@ import re
 from typing import Any, Iterator, List, Optional, Set, Tuple
 from urllib.parse import parse_qsl, urlparse
 
-from ..models import FileKind, Finding, ScanTarget, Severity
+from ..models import FileKind, Finding, McpServer, ScanTarget, Severity
 from .base import is_reference_or_placeholder, make, redact
 from .catalog import HARDCODED_SECRET as RULE
 
@@ -130,12 +130,13 @@ def check(target: ScanTarget) -> Iterator[Finding]:
                            line=lineno, evidence=redact(secret))
         return
 
-    roots: List[Tuple[Optional[str], Any]] = [(s.name, s.raw) for s in target.servers]
+    roots: List[Tuple[Optional[McpServer], Any]] = [(s, s.raw) for s in target.servers]
     if isinstance(target.data, dict) and isinstance(target.data.get("env"), dict):
         roots.append((None, {"env": target.data["env"]}))  # e.g. .claude/settings.json "env"
 
-    for server_name, root in roots:
-        start = target.server_line(server_name) if server_name else None
+    for server, root in roots:
+        server_name = server.name if server else None
+        start = server.line if server else None
         for path, value, prev in _walk(root):
             for label, secret, severity in _check_value(path, value, prev):
                 line = target.line_of(secret, start) or start

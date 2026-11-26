@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 
 class Severity(IntEnum):
@@ -72,6 +72,10 @@ class McpServer:
     url: Optional[str] = None
     headers: Dict[str, str] = field(default_factory=dict)
     raw: Dict[str, Any] = field(default_factory=dict)
+    # Where the entry lives in the document, e.g. ("projects", "/repo", "mcpServers", "gh").
+    # Names are not unique (~/.claude.json repeats them per project), so the path is the identity.
+    key_path: Tuple[str, ...] = ()
+    line: Optional[int] = None
 
     @property
     def executable(self) -> str:
@@ -123,9 +127,20 @@ class ScanTarget:
                 return self.text.count("\n", 0, idx) + 1
         return None
 
-    def server_line(self, name: str) -> Optional[int]:
-        return (
-            self.line_of(f'"{name}"')
-            or self.line_of(f"mcp_servers.{name}")
-            or self.line_of(name)
-        )
+    def locate(self, key_path: Sequence[str]) -> Optional[int]:
+        """1-based line of a nested key, found by searching for each key after the previous one.
+
+        Good enough for JSON and TOML without a position-tracking parser: "projects" then "/b"
+        then "mcpServers" then "gh" lands on the second project's "gh", not the first.
+        """
+        offset, idx = 0, -1
+        for key in key_path:
+            idx = -1
+            for cand in (json.dumps(key), key):  # quoted JSON key first, then bare (TOML headers)
+                idx = self.text.find(cand, offset)
+                if idx != -1:
+                    break
+            if idx == -1:
+                return None
+            offset = idx + 1
+        return self.text.count("\n", 0, idx) + 1 if idx != -1 else None
