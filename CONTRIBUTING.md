@@ -45,3 +45,17 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
 ```
+
+## Releasing
+
+Release tags (`v*`) are **immutable**. The `protect-release-tags` ruleset blocks moving and deleting them, with no bypass, so users can trust that a tag always means the same code. A wrong tag is never fixed in place: release the next version instead. There is no floating major tag (`v0`); users pin a commit SHA.
+
+1. Bump the version in a pull request and merge it.
+2. Tag the merged commit and push the tag:
+   ```bash
+   git fetch origin && git merge-base --is-ancestor <sha> origin/main   # must succeed: the commit is on main
+   git tag -a vX.Y.Z <sha> -m vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+3. Check that the rule is enforced: `git push origin :refs/tags/vX.Y.Z` must be **rejected** with `GH013`. If it isn't, push the tag again immediately and fix the ruleset.
+4. Publish release notes that list the commit SHA to pin.
