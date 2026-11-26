@@ -6,7 +6,9 @@ import json
 import os
 import sys
 from itertools import groupby
+from pathlib import Path, PurePath
 from typing import Dict, Optional
+from urllib.parse import quote
 
 from . import __version__
 from .models import Severity
@@ -89,7 +91,17 @@ SECURITY_SEVERITY = {Severity.CRITICAL: "9.5", Severity.HIGH: "8.0", Severity.ME
 
 
 def _uri(path: str) -> str:
-    return path[2:] if path.startswith("~/") else path
+    """SARIF artifact URI: repo-relative paths stay relative, anything else becomes file:///.
+
+    Stripping "~/" would make ~/.cursor/mcp.json look like .cursor/mcp.json inside the repo,
+    and GitHub would pin the finding on the wrong (or a missing) file.
+    """
+    if path.startswith("~/"):
+        return (Path.home() / path[2:]).as_uri()
+    p = Path(path)
+    if p.is_absolute():
+        return p.as_uri()
+    return quote(PurePath(path).as_posix())
 
 
 def render_sarif(result: ScanResult) -> str:
