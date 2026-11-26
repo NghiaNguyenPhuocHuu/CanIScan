@@ -12,7 +12,6 @@ Supported shapes:
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
@@ -65,7 +64,41 @@ def strip_jsonc(text: str) -> str:
             continue
         out.append(c)
         i += 1
-    return re.sub(r",(\s*[}\]])", r"\1", "".join(out))
+    return _strip_trailing_commas("".join(out))
+
+
+def _strip_trailing_commas(text: str) -> str:
+    """Drop commas directly before } or ], but never inside a string.
+
+    A plain regex would also rewrite string values such as "a,}", so the scanner
+    would see different data than the client that loads the file (a parser differential).
+    """
+    out: List[str] = []
+    i, n = 0, len(text)
+    in_str = False
+    while i < n:
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True
+            out.append(c)
+        elif c == ",":
+            j = i + 1
+            while j < n and text[j] in " \t\r\n":
+                j += 1
+            if j >= n or text[j] not in "}]":
+                out.append(c)
+        else:
+            out.append(c)
+        i += 1
+    return "".join(out)
 
 
 def load_jsonc(text: str) -> Any:

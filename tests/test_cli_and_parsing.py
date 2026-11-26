@@ -16,6 +16,12 @@ def test_jsonc_comments_and_trailing_commas():
     assert data == {"a": "http://x//y", "b": [1, 2]}
 
 
+def test_jsonc_trailing_comma_removal_leaves_strings_alone():
+    # Regression for #5: the scanner must see the same values the client does.
+    data = load_jsonc('{"a": "x,}", "b": ["y, ]",], // c\n}')
+    assert data == {"a": "x,}", "b": ["y, ]"]}
+
+
 def test_extract_servers_across_formats():
     assert [s.name for s in extract_servers({"mcpServers": {"a": {"command": "x"}}})] == ["a"]
     assert [s.name for s in extract_servers({"servers": {"b": {"type": "http", "url": "https://x"}}})] == ["b"]
