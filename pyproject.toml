@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "caniscan"
+version = "0.1.0"
+description = "Security scanner for AI agent and MCP configurations (Claude, Cursor, VS Code, Windsurf, Gemini, Codex)."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [{ name = "YOUR NAME" }]
+keywords = ["security", "mcp", "ai-agents", "llm", "prompt-injection", "secrets", "sast"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Security",
+]
+# Zero runtime dependencies on Python 3.11+ (tomli only backfills TOML parsing on 3.9/3.10).
+dependencies = ["tomli>=1.1; python_version < '3.11'"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+caniscan = "caniscan.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/YOUR_USER/caniscan"
+Issues = "https://github.com/YOUR_USER/caniscan/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
