@@ -6,7 +6,7 @@ import re
 from typing import Any, Iterator, List, Optional, Set, Tuple
 from urllib.parse import parse_qsl, urlparse
 
-from ..models import FileKind, Finding, McpServer, ScanTarget, Severity
+from ..models import FileKind, Finding, ScanTarget, Severity
 from .base import is_reference_or_placeholder, make, redact
 from .catalog import HARDCODED_SECRET as RULE
 
@@ -84,13 +84,19 @@ def _loc(path: Tuple[str, ...]) -> str:
     return out or "value"
 
 
-def _check_value(path: Tuple[str, ...], value: str, prev: Optional[str]) -> Iterator[Tuple[str, str, Severity]]:
-    """Yield (label, secret, severity) for one string value."""
+def _check_value(
+    path: Tuple[str, ...], value: str, prev: Optional[str], heuristics: bool = True
+) -> Iterator[Tuple[str, str, Severity]]:
+    """Yield (label, secret, severity) for one string value.
+
+    Known token formats are checked everywhere. The key-name/flag heuristics are
+    noisier, so callers only enable them where secrets are expected (servers, env blocks).
+    """
     found = False
     for label, secret in _pattern_hits(value):
         found = True
         yield label, secret, Severity.CRITICAL
-    if found:
+    if found or not heuristics:
         return
     key = next((p for p in reversed(path) if not p.startswith("[")), "")
     in_list = bool(path) and path[-1].startswith("[")
@@ -130,21 +136,26 @@ def check(target: ScanTarget) -> Iterator[Finding]:
                            line=lineno, evidence=redact(secret))
         return
 
-    roots: List[Tuple[Optional[McpServer], Any]] = [(s, s.raw) for s in target.servers]
-    if isinstance(target.data, dict) and isinstance(target.data.get("env"), dict):
-        roots.append((None, {"env": target.data["env"]}))  # e.g. .claude/settings.json "env"
-
-    for server, root in roots:
-        server_name = server.name if server else None
-        start = server.line if server else None
-        for path, value, prev in _walk(root):
-            for label, secret, severity in _check_value(path, value, prev):
-                line = target.line_of(secret, start) or start
-                if (line, secret) in seen:
-                    continue
-                seen.add((line, secret))
-                where = f"server '{server_name}'" if server_name else "settings"
-                yield make(
-                    RULE, target, f"{label} hardcoded in {where} ({_loc(path)})",
-                    severity=severity, line=line, server=server_name, evidence=redact(secret),
-                )
+    # One pass over the whole document (#3): secrets hide in more places than server entries,
+    # e.g. ~/.claude.json projects[*].env or .claude/settings.json apiKeyHelper.
+    servers = {s.key_path: s for s in target.servers if s.key_path}
+    for path, value, prev in _walk(target.data):
+        keys = tuple(p for p in path if not p.startswith("["))
+        server = next((servers[path[:i]] for i in range(len(path), 0, -1) if path[:i] in servers), None)
+        # the key-name heuristics stay scoped to places that are meant to hold credentials
+        in_env = "env" in keys[:-1] or "headers" in keys[:-1]
+        heuristics = server is not None or in_env
+        for label, secret, severity in _check_value(path, value, prev, heuristics):
+            start = server.line if server else target.locate(keys)
+            line = target.line_of(secret, start) or start
+            if (line, secret) in seen:
+                continue
+            seen.add((line, secret))
+            if server:
+                where, loc = f"server '{server.name}'", _loc(path[len(server.key_path):])
+            else:
+                where, loc = "settings", _loc(path)
+            yield make(
+                RULE, target, f"{label} hardcoded in {where} ({loc})",
+                severity=severity, line=line, server=server.name if server else None, evidence=redact(secret),
+            )
