@@ -148,7 +148,7 @@ def check_unpinned(target: ScanTarget) -> Iterator[Finding]:
         return
     for s in target.servers:
         exe, args = command_line(s)
-        line = target.server_line(s.name)
+        line = s.line
         spec = npm_package(exe, args)
         if spec:
             problem = npm_problem(spec)
@@ -194,7 +194,7 @@ def check_remote_code(target: ScanTarget) -> Iterator[Finding]:
             m = rx.search(cmd)
             if m:
                 yield make(REMOTE_CODE, target, f"Server '{s.name}' pipes a downloaded script straight into an interpreter",
-                           line=target.server_line(s.name), server=s.name, evidence=m.group(0)[:120])
+                           line=s.line, server=s.name, evidence=m.group(0)[:120])
                 break
 
 
@@ -206,7 +206,7 @@ def check_containers(target: ScanTarget) -> Iterator[Finding]:
         run = docker_run(exe, args)
         if not run:
             continue
-        line = target.server_line(s.name)
+        line = s.line
         for flag, value in run[1]:
             issue: Optional[Tuple[str, Severity]] = None
             v = value or ""

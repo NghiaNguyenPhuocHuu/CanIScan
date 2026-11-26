@@ -20,7 +20,7 @@ def check_auto_approve(target: ScanTarget) -> Iterator[Finding]:
     if target.kind != FileKind.CONFIG:
         return
     for s in target.servers:
-        line = target.server_line(s.name)
+        line = s.line
         for key in ("autoApprove", "alwaysAllow"):
             value = s.raw.get(key)
             if value is True or (isinstance(value, list) and any(str(v).strip() == "*" for v in value)):
