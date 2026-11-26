@@ -6,7 +6,7 @@ from pathlib import Path
 from caniscan.cli import main
 from caniscan.discovery import discover
 from caniscan.parsers import extract_servers, load_jsonc
-from conftest import ids, mcp
+from conftest import fake, ids, mcp
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -54,6 +54,16 @@ def test_discovery_skips_node_modules(tmp_path):
 def test_malformed_json_is_reported_not_crashing(project):
     r = project({".mcp.json": "{ not json"})
     assert r.findings == [] and "could not parse" in r.errors[0]
+
+
+def test_malformed_config_still_gets_secret_scan(project):
+    # Regression for #2: a parse error must not hide a pasted token (fail closed).
+    token = fake("gh" + "p_", 36)
+    r = project({".mcp.json": '{\n  "mcpServers": {\n    "gh": {"env": {"T": "' + token + '"}}\n  }\n  oops\n}'})
+    [f] = [f for f in r.findings if f.rule.id == "CS001"]
+    assert f.line == 3 and "could not be parsed" in f.message
+    assert token not in f.evidence
+    assert "could not parse" in r.errors[0]
 
 
 def test_cli_exit_codes_and_ignore(project, capsys):

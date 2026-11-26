@@ -116,13 +116,17 @@ def _check_value(path: Tuple[str, ...], value: str, prev: Optional[str]) -> Iter
 def check(target: ScanTarget) -> Iterator[Finding]:
     seen: Set[Tuple[Optional[int], str]] = set()
 
-    if target.kind == FileKind.INSTRUCTIONS:
+    # Fail closed: a config we could not parse still gets the raw-text pattern scan,
+    # otherwise one stray byte would hide every token in the file.
+    unparsed_config = target.kind == FileKind.CONFIG and target.data is None and target.parse_error
+    if target.kind == FileKind.INSTRUCTIONS or unparsed_config:
+        where = "a config file that could not be parsed" if unparsed_config else "an agent instruction file"
         for lineno, line in enumerate(target.text.splitlines(), 1):
             for label, secret in _pattern_hits(line):
                 if (lineno, secret) in seen:
                     continue
                 seen.add((lineno, secret))
-                yield make(RULE, target, f"{label} written in an agent instruction file",
+                yield make(RULE, target, f"{label} written in {where}",
                            line=lineno, evidence=redact(secret))
         return
 
