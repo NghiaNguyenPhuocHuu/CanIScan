@@ -42,3 +42,21 @@ jobs:
       - run: python examples/make_demo.py /tmp/demo
       - run: caniscan /tmp/demo --fail-on never
       - run: caniscan . --no-global   # the repo itself must stay clean
+
+  ci-ok:
+    # The single required status check for the main-branch ruleset. Matrix job names change when
+    # the matrix does, so the ruleset requires this one stable name instead.
+    # `if: always()` matters: when a needed job fails, a plain dependent job is *skipped*, and
+    # GitHub treats a skipped required check as passing. Check the results explicitly.
+    if: always()
+    needs: [test, self-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All CI jobs succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "needs results: $RESULTS"
+          for r in $RESULTS; do
+            [ "$r" = "success" ] || { echo "::error::a required CI job did not succeed ($r)"; exit 1; }
+          done
