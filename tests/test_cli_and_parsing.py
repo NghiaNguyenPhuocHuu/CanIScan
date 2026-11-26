@@ -128,3 +128,14 @@ def test_toml_server_line(project):
     r = project({".codex/config.toml": toml})
     [f] = [f for f in r.findings if f.rule.id == "CS003"]
     assert f.line == 4
+
+
+def test_sarif_uris():
+    # Regression for #6: never pass ~/ or absolute paths off as repo-relative.
+    from caniscan.report import _uri
+
+    assert _uri(".cursor/mcp.json") == ".cursor/mcp.json"
+    assert _uri("my dir/AGENTS.md") == "my%20dir/AGENTS.md"
+    assert _uri("~/.cursor/mcp.json") == (Path.home() / ".cursor" / "mcp.json").as_uri()
+    absolute = Path.cwd() / "x y.json"
+    assert _uri(str(absolute)) == absolute.as_uri()
