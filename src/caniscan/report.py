@@ -13,7 +13,7 @@ from .models import Severity
 from .rules import ALL_RULES
 from .scanner import ScanResult
 
-REPO_URL = "https://github.com/YOUR_USER/caniscan"
+REPO_URL = "https://github.com/NghiaNguyenPhuocHuu/CanIScan"
 COLORS = {
     Severity.CRITICAL: "\033[1;97;41m",
     Severity.HIGH: "\033[1;31m",

@@ -7,7 +7,7 @@
 Scans MCP server configs and agent instruction files for Claude, Cursor, VS Code, Windsurf, Cline, Roo, Gemini CLI, Codex and Zed:
 leaked tokens, unpinned packages, over-broad file access, auto-approved tools, and hidden prompt injections.
 
-[![CI](https://github.com/YOUR_USER/caniscan/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USER/caniscan/actions/workflows/ci.yml)
+[![CI](https://github.com/NghiaNguyenPhuocHuu/CanIScan/actions/workflows/ci.yml/badge.svg)](https://github.com/NghiaNguyenPhuocHuu/CanIScan/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -50,7 +50,7 @@ CanIScan checks all of this in about a second, with zero dependencies.
 pipx install caniscan        # or: pip install caniscan
 ```
 
-<sub>Until the first PyPI release: `pipx install git+https://github.com/YOUR_USER/caniscan`</sub>
+<sub>Until the first PyPI release: `pipx install git+https://github.com/NghiaNguyenPhuocHuu/CanIScan`</sub>
 
 ## Usage
 
@@ -118,7 +118,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: YOUR_USER/caniscan@v0
+      - uses: NghiaNguyenPhuocHuu/CanIScan@v0
         with:
           fail-on: high
       - uses: github/codeql-action/upload-sarif@v3
