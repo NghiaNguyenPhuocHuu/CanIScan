@@ -1,6 +1,6 @@
 name: "CanIScan"
 description: "Scan AI agent and MCP configurations for leaked secrets, unpinned servers, risky permissions and hidden prompt injections"
-author: "YOUR_USER"
+author: "NghiaNguyenPhuocHuu"
 branding:
   icon: "shield"
   color: "purple"

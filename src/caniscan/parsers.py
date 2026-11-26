@@ -12,9 +12,8 @@ Supported shapes:
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Tuple
 
 from .models import FileKind, McpServer, ScanTarget
 
@@ -65,7 +64,41 @@ def strip_jsonc(text: str) -> str:
             continue
         out.append(c)
         i += 1
-    return re.sub(r",(\s*[}\]])", r"\1", "".join(out))
+    return _strip_trailing_commas("".join(out))
+
+
+def _strip_trailing_commas(text: str) -> str:
+    """Drop commas directly before } or ], but never inside a string.
+
+    A plain regex would also rewrite string values such as "a,}", so the scanner
+    would see different data than the client that loads the file (a parser differential).
+    """
+    out: List[str] = []
+    i, n = 0, len(text)
+    in_str = False
+    while i < n:
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True
+            out.append(c)
+        elif c == ",":
+            j = i + 1
+            while j < n and text[j] in " \t\r\n":
+                j += 1
+            if j >= n or text[j] not in "}]":
+                out.append(c)
+        else:
+            out.append(c)
+        i += 1
+    return "".join(out)
 
 
 def load_jsonc(text: str) -> Any:
@@ -109,12 +142,14 @@ def build_server(name: str, cfg: Dict[str, Any]) -> McpServer:
     )
 
 
-def _servers_in(container: Any) -> Iterable[McpServer]:
+def _servers_in(container: Any, prefix: Tuple[str, ...]) -> Iterable[McpServer]:
     if not isinstance(container, dict):
         return
     for name, cfg in container.items():
         if isinstance(cfg, dict) and any(k in cfg for k in SERVER_HINT_KEYS):
-            yield build_server(name, cfg)
+            server = build_server(name, cfg)
+            server.key_path = prefix + (str(name),)
+            yield server
 
 
 def extract_servers(data: Any) -> List[McpServer]:
@@ -122,15 +157,15 @@ def extract_servers(data: Any) -> List[McpServer]:
     if not isinstance(data, dict):
         return servers
     for key in SERVER_CONTAINER_KEYS:
-        servers.extend(_servers_in(data.get(key)))
+        servers.extend(_servers_in(data.get(key), (key,)))
     mcp = data.get("mcp")
     if isinstance(mcp, dict):
-        servers.extend(_servers_in(mcp.get("servers")))
+        servers.extend(_servers_in(mcp.get("servers"), ("mcp", "servers")))
     projects = data.get("projects")
     if isinstance(projects, dict):
-        for project_cfg in projects.values():
+        for project, project_cfg in projects.items():
             if isinstance(project_cfg, dict):
-                servers.extend(_servers_in(project_cfg.get("mcpServers")))
+                servers.extend(_servers_in(project_cfg.get("mcpServers"), ("projects", str(project), "mcpServers")))
     return servers
 
 
@@ -159,4 +194,10 @@ def load_target(path: Path, kind: str, display_path: str = "") -> ScanTarget:
         target.parse_error = f"could not parse: {exc}"
         return target
     target.servers = extract_servers(target.data)
+    for server in target.servers:
+        server.line = (
+            target.locate(server.key_path)
+            or target.line_of(f'"{server.name}"')
+            or target.line_of(server.name)
+        )
     return target

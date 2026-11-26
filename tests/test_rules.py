@@ -69,6 +69,26 @@ def test_claude_settings_env_block(project):
     assert "CS001" in ids(r)
 
 
+
+# Regression for #3: secrets outside server entries / top-level env.
+def test_known_token_anywhere_in_config(project):
+    r = project({".claude/settings.json": {"apiKeyHelper": "echo " + fake("gh" + "p_", 36)}})
+    [f] = [f for f in r.findings if f.rule.id == "CS001"]
+    assert f.severity == Severity.CRITICAL and "apiKeyHelper" in f.message
+
+
+def test_nested_env_block_uses_key_heuristics(project):
+    r = project({".mcp.json": {"projects": {"/p": {"env": {"MY_API_KEY": "q8Lm2vX9pR4tZ7wK"}}}}})
+    [f] = [f for f in r.findings if f.rule.id == "CS001"]
+    assert f.severity == Severity.HIGH and "projects./p.env.MY_API_KEY" in f.message
+
+
+def test_key_heuristics_not_applied_outside_servers_and_env(project):
+    # Precision: random-looking values under auth-ish keys in ordinary settings are not secrets.
+    r = project({".claude/settings.json": {"oauthClientId": "Iv1.8a61f9b3a7aba766", "authProvider": "github-enterprise"}})
+    assert "CS001" not in ids(r)
+
+
 # ---------------------------------------------------------------- CS002 unpinned
 @pytest.mark.parametrize("command,args,flagged", [
     ("npx", ["-y", "@modelcontextprotocol/server-github"], True),

