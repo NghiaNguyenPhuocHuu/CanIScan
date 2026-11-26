@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from caniscan.cli import main
+from caniscan.models import Severity
 from caniscan.discovery import discover
 from caniscan.parsers import extract_servers, load_jsonc
 from conftest import fake, ids, mcp
@@ -102,6 +103,9 @@ def test_demo_project_end_to_end(tmp_path):
     assert {"CS001", "CS002", "CS003", "CS004", "CS005", "CS006", "CS007", "CS008", "CS009", "CS010"} <= rules_hit
     # the deliberately safe server must stay clean
     assert not [f for f in result.findings if f.server == "safe-remote"]
+    # the payload hidden in AGENTS.md tag characters is read as an injection, not just as hidden text
+    assert [f for f in result.findings if f.rule.id == "CS010" and f.severity == Severity.CRITICAL
+            and f.path.endswith("AGENTS.md")]
 
 
 def test_duplicate_server_names_get_their_own_lines(project):
