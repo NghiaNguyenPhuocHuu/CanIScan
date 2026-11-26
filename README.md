@@ -119,15 +119,33 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: NghiaNguyenPhuocHuu/CanIScan@v0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: NghiaNguyenPhuocHuu/CanIScan@<full-commit-sha> # v0.1.0
         with:
           fail-on: high
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
         if: always()
         with:
           sarif_file: caniscan.sarif
 ```
+
+**Pin every action to a full commit SHA, not a tag.** A tag is a movable pointer: in the
+tj-actions/changed-files compromise (CVE-2025-30066) existing version tags were re-pointed at
+malicious code, and every workflow using them ran it. A commit SHA can't be moved. Keep the version
+in a trailing comment; Dependabot (`package-ecosystem: github-actions`) updates both the SHA and the
+comment. `persist-credentials: false` keeps the job token out of `.git/config`, where later steps
+could read it.
+
+CanIScan's release tags (`v*`) are immutable: they can't be moved or deleted, and there is no
+floating `v0` tag. To find the commit of a release:
+
+```console
+git ls-remote https://github.com/NghiaNguyenPhuocHuu/CanIScan 'refs/tags/v0.1.0*'
+```
+
+For an annotated tag, use the line ending in `^{}` (the commit the tag points to, not the tag object).
 
 ## Exit codes
 
