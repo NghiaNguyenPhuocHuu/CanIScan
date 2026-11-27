@@ -85,7 +85,7 @@ python examples/make_demo.py /tmp/demo && caniscan /tmp/demo
 | <a id="cs006"></a>CS006 | dangerous-container | `--privileged`, Docker socket mounts, host-root mounts, host namespaces, dangerous capabilities |
 | <a id="cs007"></a>CS007 | auto-approved-tools | `autoApprove`/`alwaysAllow` (Cline, Roo), `"trust": true` (Gemini CLI) |
 | <a id="cs008"></a>CS008 | permissions-bypass | Claude Code `bypassPermissions`, `Bash` / `Bash(python:*)` allow rules, `enableAllProjectMcpServers` |
-| <a id="cs009"></a>CS009 | hidden-unicode | Unicode tag characters ("ASCII smuggling", **decoded for you**), bidi overrides (Trojan Source), zero-width characters |
+| <a id="cs009"></a>CS009 | hidden-unicode | Unicode tag characters ("ASCII smuggling") and variation-selector smuggling, **decoded for you**; bidi overrides (Trojan Source); zero-width and other invisible characters (soft hyphen, invisible operators, CGJ, ZWJ inside a word, stray variation selectors). Emoji sequences (flags, ZWJ families, ❤️, keycaps) are left alone. |
 | <a id="cs010"></a>CS010 | prompt-injection-phrase | "ignore previous instructions", "don't tell the user", exfiltration wording in instruction files, including text hidden in Unicode tag characters or split up by invisible characters |
 | <a id="cs011"></a>CS011 | insecure-file-permissions | World-writable configs, world-readable configs that contain secrets |
 
